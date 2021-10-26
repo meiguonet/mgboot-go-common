@@ -1,4 +1,4 @@
-module meiguonet/mgboot-go-common
+module github.com/meiguonet/mgboot-go-common
 
 go 1.15
 

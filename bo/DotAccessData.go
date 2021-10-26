@@ -2,12 +2,12 @@ package CommonBo
 
 import (
 	"encoding/json"
+	"github.com/meiguonet/mgboot-go-common/util/castx"
+	"github.com/meiguonet/mgboot-go-common/util/stringx"
 	"gopkg.in/yaml.v2"
 	"io"
 	"io/ioutil"
 	"math"
-	"meiguonet/mgboot-go-common/util/castx"
-	"meiguonet/mgboot-go-common/util/stringx"
 	"os"
 	"strings"
 	"time"

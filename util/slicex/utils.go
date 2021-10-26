@@ -1,7 +1,7 @@
 package slicex
 
 import (
-	"meiguonet/mgboot-go-common/util/castx"
+	"github.com/meiguonet/mgboot-go-common/util/castx"
 	"strings"
 )
 

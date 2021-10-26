@@ -1,11 +1,11 @@
 package CommonBo
 
 import (
+	"github.com/meiguonet/mgboot-go-common/enum/RegexConst"
+	"github.com/meiguonet/mgboot-go-common/util/castx"
+	"github.com/meiguonet/mgboot-go-common/util/slicex"
+	"github.com/meiguonet/mgboot-go-common/util/stringx"
 	"math"
-	"meiguonet/mgboot-go-common/enum/RegexConst"
-	"meiguonet/mgboot-go-common/util/castx"
-	"meiguonet/mgboot-go-common/util/slicex"
-	"meiguonet/mgboot-go-common/util/stringx"
 )
 
 type pager struct {

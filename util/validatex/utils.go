@@ -1,9 +1,9 @@
 package validatex
 
 import (
-	"meiguonet/mgboot-go-common/util/castx"
-	"meiguonet/mgboot-go-common/util/stringx"
-	"meiguonet/mgboot-go-common/util/structx"
+	"github.com/meiguonet/mgboot-go-common/util/castx"
+	"github.com/meiguonet/mgboot-go-common/util/stringx"
+	"github.com/meiguonet/mgboot-go-common/util/structx"
 	"reflect"
 	"strings"
 )

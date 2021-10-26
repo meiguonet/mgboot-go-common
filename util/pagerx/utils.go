@@ -1,7 +1,7 @@
 package pagerx
 
 import (
-	"meiguonet/mgboot-go-common/util/castx"
+	"github.com/meiguonet/mgboot-go-common/util/castx"
 )
 
 func IsNoPage(arg0 interface{}) bool {
