@@ -7,174 +7,18 @@ import (
 	"github.com/meiguonet/mgboot-go-common/enum/RegexConst"
 	"github.com/meiguonet/mgboot-go-common/util/castx"
 	"github.com/meiguonet/mgboot-go-common/util/reflectx"
-	"io"
 	"reflect"
 	"regexp"
 	"strings"
 )
 
-type xmlMapEntry struct {
-	XMLName xml.Name
-	Value   string `xml:",chardata"`
-}
 
-type stringMap map[string]string
-
-func (m *stringMap) UnmarshalXML(decoder *xml.Decoder, _ xml.StartElement) error {
-	*m = stringMap{}
-
-	for {
-		var entry xmlMapEntry
-		err := decoder.Decode(&entry)
-
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return err
-		}
-
-		(*m)[entry.XMLName.Local] = entry.Value
-	}
-
-	return nil
-}
-
-type toXmlOption interface {
-	getToXmlOptionName() string
-}
-
-type toXmlKeyTagOption struct {
-	mappings []string
-}
-
-type toXmlKeyTagEntry struct {
-	key string
-	tag string
-}
-
-func (opt *toXmlKeyTagOption) getToXmlOptionName() string {
-	return "ToXmlKeyTagOption"
-}
-
-func (opt *toXmlKeyTagOption) getEntries() []toXmlKeyTagEntry {
-	entries := make([]toXmlKeyTagEntry, 0)
-	re := regexp.MustCompile(`[\x20\t]*:[\x20\t]*`)
-
-	for _, rule := range opt.mappings {
-		rule = strings.TrimSpace(rule)
-
-		if rule == "" {
-			continue
-		}
-
-		parts := re.Split(rule, -1)
-
-		if len(parts) != 2 {
-			continue
-		}
-
-		p1 := strings.TrimSpace(parts[0])
-		p2 := strings.TrimSpace(parts[1])
-
-		if p1 == "" || p2 == "" || p1 == p2 {
-			continue
-		}
-
-		entries = append(entries, toXmlKeyTagEntry{key: p1, tag: p2})
-	}
-
-	return entries
-}
-
-type toXmlKeysOption struct {
-	mode string
-	keys []string
-}
-
-func (opt *toXmlKeysOption) getToXmlOptionName() string {
-	return "ToXmlKeysOption"
-}
-
-type toXmlCDataOption struct {
-	keys []string
-}
-
-func (opt *toXmlCDataOption) getToXmlOptionName() string {
-	return "ToXmlCDataOption"
-}
-
-type toStructOption interface {
-	getToStructOptionName() string
-}
-
-type toStructKeyFieldOption struct {
-	mappings []string
-}
-
-type toStructKeyFieldEntry struct {
-	key       string
-	fieldName string
-}
-
-func (opt *toStructKeyFieldOption) getToStructOptionName() string {
-	return "ToStructKeyFieldOption"
-}
-
-func (opt *toStructKeyFieldOption) getEntries() []toStructKeyFieldEntry {
-	entries := make([]toStructKeyFieldEntry, 0)
-	re := regexp.MustCompile(`[\x20\t]*:[\x20\t]*`)
-
-	for _, rule := range opt.mappings {
-		rule = strings.TrimSpace(rule)
-
-		if rule == "" {
-			continue
-		}
-
-		parts := re.Split(rule, -1)
-
-		if len(parts) != 2 {
-			continue
-		}
-
-		p1 := strings.TrimSpace(parts[0])
-		p2 := strings.TrimSpace(parts[1])
-
-		if p1 == "" || p2 == "" || p1 == p2 {
-			continue
-		}
-
-		entries = append(entries, toStructKeyFieldEntry{key: p1, fieldName: p2})
-	}
-
-	return entries
-}
-
-type toStructKeysOption struct {
-	mode string
-	keys []string
-}
-
-func (opt *toStructKeysOption) getToStructOptionName() string {
-	return "ToStructKeysOption"
-}
-
-// @var string[]|string mappings
-func ToXmlKeyTagMapping(mappings interface{}) *toXmlKeyTagOption {
-	rules := make([]string, 0)
-
-	if _rules, ok := mappings.([]string); ok && len(_rules) > 0 {
-		rules = _rules
-	} else if _rules, ok := mappings.(string); ok && _rules != "" {
-		re := regexp.MustCompile(RegexConst.CommaSep)
-		rules = re.Split(_rules, -1)
-	}
-
-	return &toXmlKeyTagOption{mappings: rules}
+func NewXmlKeyTagMappingOption(mappings [][2]string) *xmlKeyTagOption {
+	return &xmlKeyTagOption{mappings: mappings}
 }
 
 // @var string[]|string keys
-func ToXmlIncludeKeys(keys interface{}) *toXmlKeysOption {
+func NewXmlIncludeKeysOption(keys interface{}) *xmlKeysOption {
 	includedKeys := make([]string, 0)
 
 	if _keys, ok := keys.([]string); ok && len(_keys) > 0 {
@@ -184,11 +28,11 @@ func ToXmlIncludeKeys(keys interface{}) *toXmlKeysOption {
 		includedKeys = re.Split(_keys, -1)
 	}
 
-	return &toXmlKeysOption{mode: "include", keys: includedKeys}
+	return &xmlKeysOption{mode: "include", keys: includedKeys}
 }
 
 // @var string[]|string keys
-func ToXmlExcludeKeys(keys interface{}) *toXmlKeysOption {
+func NewXmlExcludeKeysOption(keys interface{}) *xmlKeysOption {
 	excludedKeys := make([]string, 0)
 
 	if _keys, ok := keys.([]string); ok && len(_keys) > 0 {
@@ -198,11 +42,11 @@ func ToXmlExcludeKeys(keys interface{}) *toXmlKeysOption {
 		excludedKeys = re.Split(_keys, -1)
 	}
 
-	return &toXmlKeysOption{mode: "exclude", keys: excludedKeys}
+	return &xmlKeysOption{mode: "exclude", keys: excludedKeys}
 }
 
 // @var string[]|string keys
-func ToXmlCDataKeys(keys interface{}) *toXmlCDataOption {
+func NewXmlCDataKeysOption(keys interface{}) *xmlCDataOption {
 	cdataKeys := make([]string, 0)
 
 	if _keys, ok := keys.([]string); ok && len(_keys) > 0 {
@@ -212,25 +56,15 @@ func ToXmlCDataKeys(keys interface{}) *toXmlCDataOption {
 		cdataKeys = re.Split(_keys, -1)
 	}
 
-	return &toXmlCDataOption{keys: cdataKeys}
+	return &xmlCDataOption{keys: cdataKeys}
 }
 
-// @var string[]|string mappings
-func ToStructKeyFieldMapping(mappings interface{}) *toStructKeyFieldOption {
-	rules := make([]string, 0)
-
-	if _rules, ok := mappings.([]string); ok && len(_rules) > 0 {
-		rules = _rules
-	} else if _rules, ok := mappings.(string); ok && _rules != "" {
-		re := regexp.MustCompile(RegexConst.CommaSep)
-		rules = re.Split(_rules, -1)
-	}
-
-	return &toStructKeyFieldOption{mappings: rules}
+func NewStructKeyFieldOption(mappings [][2]string) *structKeyFieldOption {
+	return &structKeyFieldOption{mappings: mappings}
 }
 
 // @var string[]|string keys
-func ToSturctIncludeKeys(keys interface{}) *toStructKeysOption {
+func NewSturctIncludeKeysOption(keys interface{}) *structKeysOption {
 	includedKeys := make([]string, 0)
 
 	if _keys, ok := keys.([]string); ok && len(_keys) > 0 {
@@ -240,11 +74,11 @@ func ToSturctIncludeKeys(keys interface{}) *toStructKeysOption {
 		includedKeys = re.Split(_keys, -1)
 	}
 
-	return &toStructKeysOption{mode: "include", keys: includedKeys}
+	return &structKeysOption{mode: "include", keys: includedKeys}
 }
 
 // @var string[]|string keys
-func ToSturctExcludeKeys(keys interface{}) *toStructKeysOption {
+func NewSturctExcludeKeysOption(keys interface{}) *structKeysOption {
 	excludedKeys := make([]string, 0)
 
 	if _keys, ok := keys.([]string); ok && len(_keys) > 0 {
@@ -254,7 +88,7 @@ func ToSturctExcludeKeys(keys interface{}) *toStructKeysOption {
 		excludedKeys = re.Split(_keys, -1)
 	}
 
-	return &toStructKeysOption{mode: "exclude", keys: excludedKeys}
+	return &structKeysOption{mode: "exclude", keys: excludedKeys}
 }
 
 func FromXml(buf []byte) map[string]string {
@@ -267,18 +101,18 @@ func FromXml(buf []byte) map[string]string {
 	return map1
 }
 
-func ToXml(map1 map[string]interface{}, opts ...toXmlOption) string {
+func ToXml(map1 map[string]interface{}, opts ...xmlOption) string {
 	if len(map1) < 1 {
 		return ""
 	}
 
-	keyTagEntries := make([]toXmlKeyTagEntry, 0)
+	keyTagEntries := make([]xmlKeyTagEntry, 0)
 	includedKeys := make([]string, 0)
 	excludedKeys := make([]string, 0)
 	cdataKeys := make([]string, 0)
 
 	for _, opt := range opts {
-		if _opt, ok := opt.(*toXmlKeyTagOption); ok {
+		if _opt, ok := opt.(*xmlKeyTagOption); ok {
 			if _opt != nil && len(keyTagEntries) < 1 {
 				keyTagEntries = _opt.getEntries()
 			}
@@ -286,7 +120,7 @@ func ToXml(map1 map[string]interface{}, opts ...toXmlOption) string {
 			continue
 		}
 
-		if _opt, ok := opt.(*toXmlKeysOption); ok {
+		if _opt, ok := opt.(*xmlKeysOption); ok {
 			if _opt != nil && len(includedKeys) < 1 && _opt.mode == "include" && len(_opt.keys) > 0 {
 				includedKeys = _opt.keys
 			} else if _opt != nil && len(excludedKeys) < 1 && _opt.mode == "exclude" && len(_opt.keys) > 0 {
@@ -296,7 +130,7 @@ func ToXml(map1 map[string]interface{}, opts ...toXmlOption) string {
 			continue
 		}
 
-		if _opt, ok := opt.(*toXmlCDataOption); ok {
+		if _opt, ok := opt.(*xmlCDataOption); ok {
 			if _opt != nil && len(cdataKeys) < 1 && len(_opt.keys) > 0 {
 				cdataKeys = _opt.keys
 			}
@@ -339,7 +173,7 @@ func ToXml(map1 map[string]interface{}, opts ...toXmlOption) string {
 			continue
 		}
 
-		var entry toXmlKeyTagEntry
+		var entry xmlKeyTagEntry
 
 		for _, _entry := range keyTagEntries {
 			if _entry.key == key {
@@ -391,18 +225,18 @@ func ToXml(map1 map[string]interface{}, opts ...toXmlOption) string {
 	return contents
 }
 
-func ToXmlFromStringMapString(map1 map[string]string, opts ...toXmlOption) string {
+func ToXmlFromStringMapString(map1 map[string]string, opts ...xmlOption) string {
 	if len(map1) < 1 {
 		return ""
 	}
 
-	keyTagEntries := make([]toXmlKeyTagEntry, 0)
+	keyTagEntries := make([]xmlKeyTagEntry, 0)
 	includedKeys := make([]string, 0)
 	excludedKeys := make([]string, 0)
 	cdataKeys := make([]string, 0)
 
 	for _, opt := range opts {
-		if _opt, ok := opt.(*toXmlKeyTagOption); ok {
+		if _opt, ok := opt.(*xmlKeyTagOption); ok {
 			if _opt != nil && len(keyTagEntries) < 1 {
 				keyTagEntries = _opt.getEntries()
 			}
@@ -410,7 +244,7 @@ func ToXmlFromStringMapString(map1 map[string]string, opts ...toXmlOption) strin
 			continue
 		}
 
-		if _opt, ok := opt.(*toXmlKeysOption); ok {
+		if _opt, ok := opt.(*xmlKeysOption); ok {
 			if _opt != nil && len(includedKeys) < 1 && _opt.mode == "include" && len(_opt.keys) > 0 {
 				includedKeys = _opt.keys
 			} else if _opt != nil && len(excludedKeys) < 1 && _opt.mode == "exclude" && len(_opt.keys) > 0 {
@@ -420,7 +254,7 @@ func ToXmlFromStringMapString(map1 map[string]string, opts ...toXmlOption) strin
 			continue
 		}
 
-		if _opt, ok := opt.(*toXmlCDataOption); ok {
+		if _opt, ok := opt.(*xmlCDataOption); ok {
 			if _opt != nil && len(cdataKeys) < 1 && len(_opt.keys) > 0 {
 				cdataKeys = _opt.keys
 			}
@@ -462,7 +296,7 @@ func ToXmlFromStringMapString(map1 map[string]string, opts ...toXmlOption) strin
 			continue
 		}
 
-		var entry toXmlKeyTagEntry
+		var entry xmlKeyTagEntry
 
 		for _, _entry := range keyTagEntries {
 			if _entry.key == key {
@@ -514,7 +348,7 @@ func ToXmlFromStringMapString(map1 map[string]string, opts ...toXmlOption) strin
 	return contents
 }
 
-func ToStruct(src map[string]interface{}, dst interface{}, opts ...toStructOption) {
+func ToStruct(src map[string]interface{}, dst interface{}, opts ...structOption) {
 	if dst == nil || len(src) < 1 {
 		return
 	}
@@ -531,12 +365,12 @@ func ToStruct(src map[string]interface{}, dst interface{}, opts ...toStructOptio
 		return
 	}
 
-	keyFieldEntries := make([]toStructKeyFieldEntry, 0)
+	keyFieldEntries := make([]structKeyFieldEntry, 0)
 	includedKeys := make([]string, 0)
 	excludedKeys := make([]string, 0)
 
 	for _, opt := range opts {
-		if _opt, ok := opt.(*toStructKeyFieldOption); ok {
+		if _opt, ok := opt.(*structKeyFieldOption); ok {
 			if _opt != nil && len(keyFieldEntries) < 1 {
 				keyFieldEntries = _opt.getEntries()
 			}
@@ -544,7 +378,7 @@ func ToStruct(src map[string]interface{}, dst interface{}, opts ...toStructOptio
 			continue
 		}
 
-		if _opt, ok := opt.(*toStructKeysOption); ok {
+		if _opt, ok := opt.(*structKeysOption); ok {
 			if _opt != nil && len(includedKeys) < 1 && _opt.mode == "include" && len(_opt.keys) > 0 {
 				includedKeys = _opt.keys
 			} else if _opt != nil && len(excludedKeys) < 1 && _opt.mode == "exclude" && len(_opt.keys) > 0 {
@@ -676,63 +510,63 @@ func DeepMerge(src, dst interface{}) (interface{}, error) {
 
 // @var string[]|string keys
 func RemoveKeys(map1 map[string]interface{}, keys interface{}) {
-	keysToRemove := make([]string, 0)
+	keysSlice1 := make([]string, 0)
 
 	if _keys, ok := keys.([]string); ok && len(_keys) > 0 {
-		keysToRemove = _keys
+		keysSlice1 = _keys
 	} else if _keys, ok := keys.(string); ok && _keys != "" {
 		re := regexp.MustCompile(RegexConst.CommaSep)
-		keysToRemove = re.Split(_keys, -1)
+		keysSlice1 = re.Split(_keys, -1)
 	}
 
-	if len(keysToRemove) < 1 {
+	if len(keysSlice1) < 1 {
 		return
 	}
 
-	for key := range map1 {
-		var matched bool
+	keysSlice2 := make([]string, 0)
 
-		for _, _key := range keysToRemove {
-			if _key == key {
-				matched = true
+	for key := range map1 {
+		for _, cmpkey := range keysSlice1 {
+			if key == cmpkey {
+				keysSlice2 = append(keysSlice2, key)
 				break
 			}
 		}
+	}
 
-		if matched {
-			delete(map1, key)
-		}
+	for _, key := range keysSlice2 {
+		delete(map1, key)
 	}
 }
 
 // @var string[]|string keys
 func RemoveKeysFromStringMapString(map1 map[string]string, keys interface{}) {
-	keysToRemove := make([]string, 0)
+	keysSlice1 := make([]string, 0)
 
 	if _keys, ok := keys.([]string); ok && len(_keys) > 0 {
-		keysToRemove = _keys
+		keysSlice1 = _keys
 	} else if _keys, ok := keys.(string); ok && _keys != "" {
 		re := regexp.MustCompile(RegexConst.CommaSep)
-		keysToRemove = re.Split(_keys, -1)
+		keysSlice1 = re.Split(_keys, -1)
 	}
 
-	if len(keysToRemove) < 1 {
+	if len(keysSlice1) < 1 {
 		return
 	}
 
-	for key := range map1 {
-		var matched bool
+	keysSlice2 := make([]string, 0)
 
-		for _, _key := range keysToRemove {
-			if _key == key {
-				matched = true
+	for key := range map1 {
+		for _, cmpkey := range keysSlice1 {
+			if key == cmpkey {
+				keysSlice2 = append(keysSlice2, key)
 				break
 			}
 		}
+	}
 
-		if matched {
-			delete(map1, key)
-		}
+	for _, key := range keysSlice2 {
+		delete(map1, key)
 	}
 }
 
@@ -878,7 +712,7 @@ func convertSlice(arg0 interface{}) []interface{} {
 	return nil
 }
 
-func getMapKeyByStructField(field reflect.StructField, entries []toStructKeyFieldEntry) string {
+func getMapKeyByStructField(field reflect.StructField, entries []structKeyFieldEntry) string {
 	for _, entry := range entries {
 		if strings.ToLower(entry.fieldName) == strings.ToLower(field.Name) {
 			return entry.key
