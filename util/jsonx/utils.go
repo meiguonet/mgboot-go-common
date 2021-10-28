@@ -9,11 +9,6 @@ import (
 
 var re1 = regexp.MustCompile(`"(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})[^"]+"`)
 
-type ToJsonOption struct {
-	HandleTimeField   bool
-	StripZeroTimePart bool
-}
-
 func MapFrom(arg0 interface{}) map[string]interface{} {
 	var buf []byte
 
@@ -50,7 +45,7 @@ func ArrayFrom(arg0 interface{}) []interface{} {
 	return list
 }
 
-func ToJson(arg0 interface{}, opts ...ToJsonOption) string {
+func ToJson(arg0 interface{}, opts ...*option) string {
 	buf := bytes.NewBuffer([]byte{})
 	encoder := json.NewEncoder(buf)
 	encoder.SetEscapeHTML(false)
@@ -60,33 +55,56 @@ func ToJson(arg0 interface{}, opts ...ToJsonOption) string {
 	}
 
 	contents := buf.String()
-	var opt ToJsonOption
+	var opt *option
 
 	if len(opts) > 0 {
 		opt = opts[0]
 	}
 
-	if !opt.HandleTimeField {
+	if opt == nil {
 		return contents
 	}
 
-	matches := re1.FindAllStringSubmatch(contents, -1)
+	if opt.handleTimeField {
+		matches := re1.FindAllStringSubmatch(contents, -1)
 
-	if len(matches) < 1 {
-		return contents
+		if len(matches) < 1 {
+			return contents
+		}
+
+		for _, groups := range matches {
+			if len(groups) < 3 {
+				continue
+			}
+
+			if groups[2] == "00:00:00" && opt.stripZeroTimePart {
+				contents = strings.Replace(contents, groups[0], groups[1], 1)
+				continue
+			}
+
+			contents = strings.Replace(contents, groups[0], groups[1] + " " + groups[2], 1)
+		}
 	}
 
-	for _, groups := range matches {
-		if len(groups) < 3 {
-			continue
-		}
+	if len(opt.replacements) > 0 {
+		for _, parts := range opt.replacements {
+			if parts[0] == "" || parts[1] == "" {
+				continue
+			}
 
-		if groups[2] == "00:00:00" && opt.StripZeroTimePart {
-			contents = strings.Replace(contents, groups[0], groups[1], 1)
-			continue
-		}
+			if !strings.HasPrefix(parts[0], "@regex:") {
+				contents = strings.ReplaceAll(contents, parts[0], parts[1])
+				continue
+			}
 
-		contents = strings.Replace(contents, groups[0], groups[1] + " " + groups[2], 1)
+			re2, err := regexp.Compile(strings.ReplaceAll(parts[0], "@regex:", ""))
+
+			if err != nil {
+				continue
+			}
+
+			contents = re2.ReplaceAllString(contents, parts[1])
+		}
 	}
 
 	return contents
