@@ -53,13 +53,13 @@ func GetRealpath(fpath string, baseDir ...string) string {
 		relative = true
 		fpath = strings.TrimPrefix(fpath, "{classpath}")
 		fpath = strings.TrimLeft(fpath, "/")
-	} else if strings.HasPrefix(fpath, "baseDir:") {
+	} else if strings.HasPrefix(fpath, "datadir:") {
 		relative = true
-		fpath = strings.TrimPrefix(fpath, "baseDir:")
+		fpath = strings.TrimPrefix(fpath, "datadir:")
 		fpath = strings.TrimLeft(fpath, "/")
-	} else if strings.HasPrefix(fpath, "{baseDir}") {
+	} else if strings.HasPrefix(fpath, "{datadir}") {
 		relative = true
-		fpath = strings.TrimPrefix(fpath, "{baseDir}")
+		fpath = strings.TrimPrefix(fpath, "{datadir}")
 		fpath = strings.TrimLeft(fpath, "/")
 	} else if strings.HasPrefix(fpath, "ProjectRoot:") {
 		relative = true
