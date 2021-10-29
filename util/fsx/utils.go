@@ -1,6 +1,8 @@
 package fsx
 
 import (
+	"github.com/meiguonet/mgboot-go-common/AppConf"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -16,18 +18,120 @@ func GetExtension(fpath string) string {
 		return ""
 	}
 
-	return strings.ToLower(filepath.Ext(fpath))
-}
+	ext := strings.ToLower(filepath.Ext(fpath))
 
-func GetRealpath(basedir, fpath string) string {
-	if basedir == "" || !strings.HasPrefix(fpath, "classpath:") {
-		return fpath
+	if strings.HasPrefix(ext, ".") {
+		return ext[1:]
 	}
 
-	fpath = strings.TrimPrefix(fpath, "classpath:")
+	return ext
+}
+
+func GetRealpath(fpath string, baseDir ...string) string {
 	fpath = strings.ReplaceAll(fpath, "\\", "/")
-	fpath = strings.Trim(fpath, "/")
-	basedir = strings.ReplaceAll(basedir, "\\", "/")
-	basedir = strings.TrimSuffix(basedir, "/")
-	return basedir + "/" + fpath
+	fpath = strings.TrimRight(fpath, "/")
+	var dir string
+
+	if len(baseDir) > 0 {
+		dir = baseDir[0]
+	}
+
+	if dir == "" {
+		dir = AppConf.GetDataDir()
+	}
+
+	dir = strings.ReplaceAll(dir, "\\", "/")
+	dir = strings.TrimRight(dir, "/")
+	var relative bool
+	var relativeWd bool
+
+	if strings.HasPrefix(fpath, "classpath:") {
+		relative = true
+		fpath = strings.TrimPrefix(fpath, "classpath:")
+		fpath = strings.TrimLeft(fpath, "/")
+	} else if strings.HasPrefix(fpath, "{classpath}") {
+		relative = true
+		fpath = strings.TrimPrefix(fpath, "{classpath}")
+		fpath = strings.TrimLeft(fpath, "/")
+	} else if strings.HasPrefix(fpath, "baseDir:") {
+		relative = true
+		fpath = strings.TrimPrefix(fpath, "baseDir:")
+		fpath = strings.TrimLeft(fpath, "/")
+	} else if strings.HasPrefix(fpath, "{baseDir}") {
+		relative = true
+		fpath = strings.TrimPrefix(fpath, "{baseDir}")
+		fpath = strings.TrimLeft(fpath, "/")
+	} else if strings.HasPrefix(fpath, "ProjectRoot:") {
+		relative = true
+		fpath = strings.TrimPrefix(fpath, "ProjectRoot:")
+		fpath = strings.TrimLeft(fpath, "/")
+	} else if strings.HasPrefix(fpath, "project_root:") {
+		relative = true
+		fpath = strings.TrimPrefix(fpath, "project_root:")
+		fpath = strings.TrimLeft(fpath, "/")
+	} else if strings.HasPrefix(fpath, "{ProjectRoot}") {
+		relative = true
+		fpath = strings.TrimPrefix(fpath, "{ProjectRoot}")
+		fpath = strings.TrimLeft(fpath, "/")
+	} else if strings.HasPrefix(fpath, "{project_root}") {
+		relative = true
+		fpath = strings.TrimPrefix(fpath, "{project_root}")
+		fpath = strings.TrimLeft(fpath, "/")
+	} else if strings.HasPrefix(fpath, "AppRoot:") {
+		relative = true
+		fpath = strings.TrimPrefix(fpath, "AppRoot:")
+		fpath = strings.TrimLeft(fpath, "/")
+	} else if strings.HasPrefix(fpath, "app_root:") {
+		relative = true
+		fpath = strings.TrimPrefix(fpath, "app_root:")
+		fpath = strings.TrimLeft(fpath, "/")
+	} else if strings.HasPrefix(fpath, "{AppRoot}") {
+		relative = true
+		fpath = strings.TrimPrefix(fpath, "{AppRoot}")
+		fpath = strings.TrimLeft(fpath, "/")
+	} else if strings.HasPrefix(fpath, "{app_root}") {
+		relative = true
+		fpath = strings.TrimPrefix(fpath, "{app_root}")
+		fpath = strings.TrimLeft(fpath, "/")
+	} else if strings.HasPrefix(fpath, "wd:") {
+		relativeWd = true
+		fpath = strings.TrimPrefix(fpath, "wd:")
+		fpath = strings.TrimLeft(fpath, "/")
+	} else if strings.HasPrefix(fpath, "{wd}") {
+		relativeWd = true
+		fpath = strings.TrimPrefix(fpath, "{wd}")
+		fpath = strings.TrimLeft(fpath, "/")
+	} else if strings.HasPrefix(fpath, "cwd:") {
+		relativeWd = true
+		fpath = strings.TrimPrefix(fpath, "cwd:")
+		fpath = strings.TrimLeft(fpath, "/")
+	} else if strings.HasPrefix(fpath, "{cwd}") {
+		relativeWd = true
+		fpath = strings.TrimPrefix(fpath, "{cwd}")
+		fpath = strings.TrimLeft(fpath, "/")
+	}
+
+	if relativeWd {
+		wd, _ := os.Getwd()
+
+		if wd == "" {
+			return fpath
+		}
+
+		wd = strings.ReplaceAll(wd, "\\", "/")
+		wd = strings.TrimRight(wd, "/")
+		return wd + "/" + fpath
+	}
+
+	if relative {
+		if dir == "" {
+			return fpath
+		}
+
+		dir = strings.ReplaceAll(dir, "\\", "/")
+		dir = strings.TrimRight(dir, "/")
+		return dir + "/" + fpath
+	}
+
+	return fpath
 }

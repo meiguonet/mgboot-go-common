@@ -4,14 +4,19 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"github.com/meiguonet/mgboot-go-common/enum/DatetimeFormat"
 	"github.com/meiguonet/mgboot-go-common/enum/RegexConst"
 	"github.com/meiguonet/mgboot-go-common/util/castx"
+	"github.com/meiguonet/mgboot-go-common/util/numberx"
 	"github.com/meiguonet/mgboot-go-common/util/reflectx"
+	"github.com/meiguonet/mgboot-go-common/util/stringx"
+	"math"
 	"reflect"
 	"regexp"
 	"strings"
+	"time"
+	"unsafe"
 )
-
 
 func NewXmlKeyTagMappingOption(mappings [][2]string) *xmlKeyTagOption {
 	return &xmlKeyTagOption{mappings: mappings}
@@ -510,6 +515,10 @@ func DeepMerge(src, dst interface{}) (interface{}, error) {
 
 // @var string[]|string keys
 func RemoveKeys(map1 map[string]interface{}, keys interface{}) {
+	if len(map1) < 1 {
+		return
+	}
+
 	keysSlice1 := make([]string, 0)
 
 	if _keys, ok := keys.([]string); ok && len(_keys) > 0 {
@@ -541,6 +550,10 @@ func RemoveKeys(map1 map[string]interface{}, keys interface{}) {
 
 // @var string[]|string keys
 func RemoveKeysFromStringMapString(map1 map[string]string, keys interface{}) {
+	if len(map1) < 1 {
+		return
+	}
+
 	keysSlice1 := make([]string, 0)
 
 	if _keys, ok := keys.([]string); ok && len(_keys) > 0 {
@@ -571,108 +584,457 @@ func RemoveKeysFromStringMapString(map1 map[string]string, keys interface{}) {
 }
 
 // @var string[]|string keys
-func CopyFields(map1 map[string]interface{}, keys interface{}) map[string]interface{} {
-	keysToCopy := make([]string, 0)
+func CopyFields(srcMap map[string]interface{}, keys interface{}) map[string]interface{} {
+	if len(srcMap) < 1 {
+		return map[string]interface{}{}
+	}
 
-	if _keys, ok := keys.([]string); ok && len(_keys) > 0 {
-		keysToCopy = _keys
-	} else if _keys, ok := keys.(string); ok && _keys != "" {
+	_keys := make([]string, 0)
+
+	if a1, ok := keys.([]string); ok && len(a1) > 0 {
+		_keys = a1
+	} else if s1, ok := keys.(string); ok && s1 != "" {
 		re := regexp.MustCompile(RegexConst.CommaSep)
-		keysToCopy = re.Split(_keys, -1)
+		_keys = re.Split(s1, -1)
 	}
 
-	ret := make(map[string]interface{})
-
-	if len(keysToCopy) < 1 {
-		return ret
+	if len(_keys) < 1 {
+		return map[string]interface{}{}
 	}
 
-	for key, value := range map1 {
-		var matched bool
+	dstKeys := map[string]string{}
 
-		for _, _key := range keysToCopy {
-			if _key == key {
-				matched = true
+	for idx, key := range _keys {
+		if strings.Contains(key, ":") {
+			p1 := stringx.SubstringBefore(key, ":")
+			p2 := stringx.SubstringAfter(key, ":")
+			dstKeys[strings.ToLower(p1)] = p2
+			_keys[idx] = p1
+			continue
+		}
+
+		if strings.Contains(key, "#") {
+			p1 := stringx.SubstringBefore(key, "#")
+			p2 := stringx.SubstringAfter(key, "#")
+			dstKeys[strings.ToLower(p1)] = p2
+			_keys[idx] = p1
+			continue
+		}
+	}
+
+	dstMap := map[string]interface{}{}
+
+	for _, key := range _keys {
+		var matchedKey string
+
+		for cmpkey := range srcMap {
+			if strings.ToLower(cmpkey) == strings.ToLower(key) {
+				matchedKey = cmpkey
 				break
 			}
 		}
 
-		if matched {
-			ret[key] = value
+		if matchedKey == "" {
+			continue
 		}
+
+		dstKey := dstKeys[strings.ToLower(matchedKey)]
+
+		if dstKey == "" {
+			dstKey = matchedKey
+		}
+
+		dstMap[dstKey] = srcMap[matchedKey]
 	}
 
-	return ret
+	return dstMap
 }
 
 // @var string[]|string keys
-func CopyFieldsToStringMapString(map1 map[string]interface{}, keys interface{}) map[string]string {
-	keysToCopy := make([]string, 0)
+func CopyFieldsToStringMapString(srcMap map[string]interface{}, keys interface{}) map[string]string {
+	if len(srcMap) < 1 {
+		return map[string]string{}
+	}
 
-	if _keys, ok := keys.([]string); ok && len(_keys) > 0 {
-		keysToCopy = _keys
-	} else if _keys, ok := keys.(string); ok && _keys != "" {
+	_keys := make([]string, 0)
+
+	if a1, ok := keys.([]string); ok && len(a1) > 0 {
+		_keys = a1
+	} else if s1, ok := keys.(string); ok && s1 != "" {
 		re := regexp.MustCompile(RegexConst.CommaSep)
-		keysToCopy = re.Split(_keys, -1)
+		_keys = re.Split(s1, -1)
 	}
 
-	ret := make(map[string]string)
-
-	if len(keysToCopy) < 1 {
-		return ret
+	if len(_keys) < 1 {
+		return map[string]string{}
 	}
 
-	for key, value := range map1 {
-		var matched bool
+	dstKeys := map[string]string{}
 
-		for _, _key := range keysToCopy {
-			if _key == key {
-				matched = true
+	for idx, key := range _keys {
+		if strings.Contains(key, ":") {
+			p1 := stringx.SubstringBefore(key, ":")
+			p2 := stringx.SubstringAfter(key, ":")
+			dstKeys[strings.ToLower(p1)] = p2
+			_keys[idx] = p1
+			continue
+		}
+
+		if strings.Contains(key, "#") {
+			p1 := stringx.SubstringBefore(key, "#")
+			p2 := stringx.SubstringAfter(key, "#")
+			dstKeys[strings.ToLower(p1)] = p2
+			_keys[idx] = p1
+			continue
+		}
+	}
+
+	dstMap := map[string]string{}
+
+	for _, key := range _keys {
+		var matchedKey string
+
+		for cmpkey := range srcMap {
+			if strings.ToLower(cmpkey) == strings.ToLower(key) {
+				matchedKey = cmpkey
 				break
 			}
 		}
 
-		if matched {
-			ret[key] = castx.ToString(value)
+		if matchedKey == "" {
+			continue
 		}
+
+		value, err := castx.ToStringE(srcMap[matchedKey])
+
+		if err != nil {
+			continue
+		}
+
+		dstKey := dstKeys[strings.ToLower(matchedKey)]
+
+		if dstKey == "" {
+			dstKey = matchedKey
+		}
+
+		dstMap[dstKey] = value
 	}
 
-	return ret
+	return dstMap
 }
 
 // @var string[]|string keys
-func CopyFieldsFromStringMapString(map1 map[string]string, keys interface{}) map[string]string {
-	keysToCopy := make([]string, 0)
+func CopyFieldsFromStringMapString(srcMap map[string]string, keys interface{}) map[string]string {
+	if len(srcMap) < 1 {
+		return map[string]string{}
+	}
 
-	if _keys, ok := keys.([]string); ok && len(_keys) > 0 {
-		keysToCopy = _keys
-	} else if _keys, ok := keys.(string); ok && _keys != "" {
+	_keys := make([]string, 0)
+
+	if a1, ok := keys.([]string); ok && len(a1) > 0 {
+		_keys = a1
+	} else if s1, ok := keys.(string); ok && s1 != "" {
 		re := regexp.MustCompile(RegexConst.CommaSep)
-		keysToCopy = re.Split(_keys, -1)
+		_keys = re.Split(s1, -1)
 	}
 
-	ret := make(map[string]string)
-
-	if len(keysToCopy) < 1 {
-		return ret
+	if len(_keys) < 1 {
+		return map[string]string{}
 	}
 
-	for key, value := range map1 {
-		var matched bool
+	dstKeys := map[string]string{}
 
-		for _, _key := range keysToCopy {
-			if _key == key {
-				matched = true
+	for idx, key := range _keys {
+		if strings.Contains(key, ":") {
+			p1 := stringx.SubstringBefore(key, ":")
+			p2 := stringx.SubstringAfter(key, ":")
+			dstKeys[strings.ToLower(p1)] = p2
+			_keys[idx] = p1
+			continue
+		}
+
+		if strings.Contains(key, "#") {
+			p1 := stringx.SubstringBefore(key, "#")
+			p2 := stringx.SubstringAfter(key, "#")
+			dstKeys[strings.ToLower(p1)] = p2
+			_keys[idx] = p1
+			continue
+		}
+	}
+
+	dstMap := map[string]string{}
+
+	for _, key := range _keys {
+		var matchedKey string
+
+		for cmpkey := range srcMap {
+			if strings.ToLower(cmpkey) == strings.ToLower(key) {
+				matchedKey = cmpkey
 				break
 			}
 		}
 
-		if matched {
-			ret[key] = value
+		if matchedKey == "" {
+			continue
+		}
+
+		dstKey := dstKeys[strings.ToLower(matchedKey)]
+
+		if dstKey == "" {
+			dstKey = matchedKey
+		}
+
+		dstMap[dstKey] = srcMap[matchedKey]
+	}
+
+	return dstMap
+}
+
+// @var string[]|string rules
+func FromRequestParam(srcMap map[string]interface{}, rules ...interface{}) map[string]interface{} {
+	if len(srcMap) < 1 {
+		return map[string]interface{}{}
+	}
+
+	var _rules []string
+
+	if len(rules) > 0 {
+		if a1, ok := rules[0].([]string); ok && len(a1) > 0 {
+			_rules = a1
+		} else if s1, ok := rules[0].(string); ok && s1 != "" {
+			re := regexp.MustCompile(RegexConst.CommaSep)
+			_rules = re.Split(s1, -1)
 		}
 	}
 
-	return ret
+	if len(_rules) < 1 {
+		return srcMap
+	}
+
+	dstKeys := make([]string, 0)
+
+	for idx, rule := range _rules {
+		if strings.Contains(rule, "#") {
+			dstKeys = append(dstKeys, stringx.SubstringBefore(rule, "#"))
+			_rules[idx] = stringx.SubstringAfter(rule, "#")
+		} else {
+			dstKeys = append(dstKeys, "")
+		}
+	}
+
+	dstMap := map[string]interface{}{}
+	re1 := regexp.MustCompile(`:[^:]+$`)
+	re2 := regexp.MustCompile(`:[0-9]+$`)
+
+	for idx, rule := range _rules {
+		name := rule
+		typ := 1
+		mode := 2
+		dv := ""
+
+		if strings.HasPrefix(name, "i:") {
+			name = stringx.SubstringAfter(name, ":")
+			typ = 2
+
+			if re1.MatchString(name) {
+				dv = stringx.SubstringAfterLast(name, ":")
+				name = re1.ReplaceAllString(name, "")
+			}
+		} else if strings.HasPrefix(name, "d:") {
+			name = stringx.SubstringAfter(name, ":")
+			typ = 3
+
+			if re1.MatchString(name) {
+				dv = stringx.SubstringAfterLast(name, ":")
+				name = re1.ReplaceAllString(name, "")
+			}
+		} else if strings.HasPrefix(name, "s:") {
+			name = stringx.SubstringAfter(name, ":")
+
+			if re2.MatchString(name) {
+				s1 := stringx.SubstringAfterLast(name, ":")
+				mode = castx.ToInt(s1, 2)
+				name = re2.ReplaceAllString(name, "")
+			}
+		} else if re2.MatchString(name) {
+			s1 := stringx.SubstringAfterLast(name, ":")
+			mode = castx.ToInt(s1, 2)
+			name = re2.ReplaceAllString(name, "")
+		}
+
+		if strings.Contains(name, ":") {
+			name = stringx.SubstringBefore(name, ":")
+		}
+
+		if name == "" {
+			continue
+		}
+
+		var dstKey string
+
+		if dstKeys[idx] != "" {
+			dstKey = dstKeys[idx]
+		} else {
+			dstKey = name
+		}
+
+		switch typ {
+		case 1:
+			value := castx.ToString(srcMap[name])
+
+			switch mode {
+			case 1, 2:
+				value = stringx.StripTags(value)
+			}
+
+			dstMap[dstKey] = value
+		case 2:
+			var value int
+
+			if n1, err := castx.ToIntE(dv); err == nil {
+				value = castx.ToInt(srcMap[name], n1)
+			} else {
+				value = castx.ToInt(srcMap[name])
+			}
+
+			dstMap[dstKey] = value
+		case 3:
+			var value float64
+
+			if n1, err := castx.ToFloat64E(dv); err == nil {
+				value = castx.ToFloat64(srcMap[name], n1)
+			} else {
+				value = castx.ToFloat64(srcMap[name])
+			}
+
+			dstMap[dstKey] = numberx.ToDecimalString(value)
+		}
+	}
+
+	return dstMap
+}
+
+func BindToDto(srcMap map[string]interface{}, dto interface{}) error {
+	if len(srcMap) < 1 || dto == nil {
+		return errors.New("in mapx.BindToDto function, argument #0 must be a not empty map[string]interface{}")
+	}
+
+	ex1 := errors.New("in mapx.BindToDto function, argument #1 must be a struct pointer")
+	rt := reflect.TypeOf(dto)
+
+	if rt.Kind() != reflect.Ptr {
+		return ex1
+	}
+
+	rt = rt.Elem()
+
+	if rt.Kind() != reflect.Struct || rt.NumField() < 1 {
+		return ex1
+	}
+
+	defer func() {
+		recover()
+	}()
+
+	structPtr := getStructPtr(dto)
+	re1 := regexp.MustCompile(`MapKey:([^\x20\t]+)`)
+	re2 := regexp.MustCompile(`SecurityMode:([^\x20\t]+)`)
+	re3 := regexp.MustCompile(`DefaultValue:([^\x20\t]+)`)
+
+	for i := 0; i < rt.NumField(); i++ {
+		field := rt.Field(i)
+		tag := field.Tag.Get("DtoBind")
+		var key string
+		matches := re1.FindStringSubmatch(tag)
+
+		if len(matches) > 1 {
+			key = matches[1]
+		} else {
+			key = field.Name
+		}
+
+		mode := 2
+		matches = re2.FindStringSubmatch(tag)
+
+		if len(matches) > 1 {
+			if n1, err := castx.ToIntE(matches[1]); err == nil {
+				mode = n1
+			}
+		}
+
+		dv := ""
+
+		matches = re3.FindStringSubmatch(tag)
+
+		if len(matches) > 1 {
+			dv = matches[1]
+		}
+
+		switch field.Type.Kind() {
+		case reflect.String:
+			bindDtoStringField(structPtr, field, srcMap[key], mode, dv)
+			continue
+		case reflect.Bool:
+			var defaultValue bool
+
+			if b1, err := castx.ToBoolE(dv); err == nil {
+				defaultValue = b1
+			}
+
+			bindDtoBoolField(structPtr, field, srcMap[key], defaultValue)
+			continue
+		case reflect.Int:
+			defaultValue := math.MinInt32
+
+			if n1, err := castx.ToIntE(dv); err == nil {
+				defaultValue = n1
+			}
+
+			bindDtoIntField(structPtr, field, srcMap[key], defaultValue)
+			continue
+		case reflect.Int64:
+			defaultValue := int64(math.MinInt64)
+
+			if n1, err := castx.ToInt64E(dv); err == nil {
+				defaultValue = n1
+			}
+
+			bindDtoInt64Field(structPtr, field, srcMap[key], defaultValue)
+			continue
+		case reflect.Float32:
+			defaultValue := float32(math.SmallestNonzeroFloat32)
+
+			if n1, err := castx.ToFloat32E(dv); err == nil {
+				defaultValue = n1
+			}
+
+			bindDtoFloat32Field(structPtr, field, srcMap[key], defaultValue)
+			continue
+		case reflect.Float64:
+			defaultValue := math.SmallestNonzeroFloat64
+
+			if n1, err := castx.ToFloat64E(dv); err == nil {
+				defaultValue = n1
+			}
+
+			bindDtoFloat64Field(structPtr, field, srcMap[key], defaultValue)
+			continue
+		}
+
+		if strings.Contains(field.Type.String(), "*time.Time") {
+			bindDtoTimePtrField(structPtr, field, srcMap[key], tag)
+			continue
+		}
+
+		if strings.Contains(field.Type.String(), "time.Time") {
+			bindDtoTimeField(structPtr, field, srcMap[key], tag)
+			continue
+		}
+
+		return errors.New("in mapx.BindToDto function, unsupported dto field type: " + field.Type.String())
+	}
+
+	return nil
 }
 
 func convertSlice(arg0 interface{}) []interface{} {
@@ -734,4 +1096,227 @@ func unsafeSetStructFieldValue(rv reflect.Value, idx int, value interface{}) {
 	}()
 
 	rv.Field(idx).Set(reflect.ValueOf(value))
+}
+
+func bindDtoStringField(
+	structPtr unsafe.Pointer,
+	field reflect.StructField,
+	value interface{},
+	securityMode int,
+	defaultValue string,
+) {
+	var realValue string
+
+	if s1, err := castx.ToStringE(value); err == nil && s1 != "" {
+		realValue = s1
+	} else {
+		realValue = defaultValue
+	}
+
+	if securityMode == 1 || securityMode == 2 {
+		realValue = stringx.StripTags(realValue)
+	}
+
+	fieldPtr := getStructFieldPtr(structPtr, field)
+	*((*string)(unsafe.Pointer(fieldPtr))) = realValue
+}
+
+func bindDtoBoolField(
+	structPtr unsafe.Pointer,
+	field reflect.StructField,
+	value interface{},
+	defaultValue bool,
+) {
+	var realValue bool
+
+	if b1, err := castx.ToBoolE(value); err == nil {
+		realValue = b1
+	} else {
+		realValue = defaultValue
+	}
+
+	fieldPtr := getStructFieldPtr(structPtr, field)
+	*((*bool)(unsafe.Pointer(fieldPtr))) = realValue
+}
+
+func bindDtoIntField(
+	structPtr unsafe.Pointer,
+	field reflect.StructField,
+	value interface{},
+	defaultValue int,
+) {
+	var realValue int
+
+	if n1, err := castx.ToIntE(value); err == nil {
+		realValue = n1
+	} else {
+		realValue = defaultValue
+	}
+
+	fieldPtr := getStructFieldPtr(structPtr, field)
+	*((*int)(unsafe.Pointer(fieldPtr))) = realValue
+}
+
+func bindDtoInt64Field(
+	structPtr unsafe.Pointer,
+	field reflect.StructField,
+	value interface{},
+	defaultValue int64,
+) {
+	var realValue int64
+
+	if n1, err := castx.ToInt64E(value); err == nil {
+		realValue = n1
+	} else {
+		realValue = defaultValue
+	}
+
+	fieldPtr := getStructFieldPtr(structPtr, field)
+	*((*int64)(unsafe.Pointer(fieldPtr))) = realValue
+}
+
+func bindDtoFloat32Field(
+	structPtr unsafe.Pointer,
+	field reflect.StructField,
+	value interface{},
+	defaultValue float32,
+) {
+	var realValue float32
+
+	if n1, err := castx.ToFloat32E(value); err == nil {
+		realValue = n1
+	} else {
+		realValue = defaultValue
+	}
+
+	fieldPtr := getStructFieldPtr(structPtr, field)
+	*((*float32)(unsafe.Pointer(fieldPtr))) = realValue
+}
+
+func bindDtoFloat64Field(
+	structPtr unsafe.Pointer,
+	field reflect.StructField,
+	value interface{},
+	defaultValue float64,
+) {
+	var realValue float64
+
+	if n1, err := castx.ToFloat64E(value); err == nil {
+		realValue = n1
+	} else {
+		realValue = defaultValue
+	}
+
+	fieldPtr := getStructFieldPtr(structPtr, field)
+	*((*float64)(unsafe.Pointer(fieldPtr))) = realValue
+}
+
+func bindDtoTimePtrField(
+	structPtr unsafe.Pointer,
+	field reflect.StructField,
+	value interface{},
+	tag string,
+) {
+	fieldPtr := getStructFieldPtr(structPtr, field)
+
+	if d1, ok := value.(time.Time); ok && !d1.IsZero() {
+		*((**time.Time)(unsafe.Pointer(fieldPtr))) = &d1
+		return
+	}
+
+	if d1, ok := value.(*time.Time); ok && d1 != nil && !d1.IsZero() {
+		*((**time.Time)(unsafe.Pointer(fieldPtr))) = d1
+		return
+	}
+
+	s1 := castx.ToString(value)
+
+	if s1 == "" {
+		return
+	}
+
+	var d1 time.Time
+	var err error
+
+	if strings.Contains(tag, "DateOnly") {
+		d1, err = time.Parse(DatetimeFormat.DateOnly, s1)
+	} else if strings.Contains(tag, "TimeOnly") {
+		d1, err = time.Parse(DatetimeFormat.TimeOnly, s1)
+	} else {
+		d1, err = time.Parse(DatetimeFormat.Full, s1)
+	}
+
+	if err != nil {
+		return
+	}
+
+	*((**time.Time)(unsafe.Pointer(fieldPtr))) = &d1
+}
+
+func bindDtoTimeField(
+	structPtr unsafe.Pointer,
+	field reflect.StructField,
+	value interface{},
+	tag string,
+) {
+	fieldPtr := getStructFieldPtr(structPtr, field)
+
+	if d1, ok := value.(time.Time); ok && !d1.IsZero() {
+		*((*time.Time)(unsafe.Pointer(fieldPtr))) = d1
+		return
+	}
+
+	if d1, ok := value.(*time.Time); ok && d1 != nil && !d1.IsZero() {
+		*((*time.Time)(unsafe.Pointer(fieldPtr))) = indirect(d1).(time.Time)
+		return
+	}
+
+	s1 := castx.ToString(value)
+
+	if s1 == "" {
+		return
+	}
+
+	var d1 time.Time
+	var err error
+
+	if strings.Contains(tag, "DateOnly") {
+		d1, err = time.Parse(DatetimeFormat.DateOnly, s1)
+	} else if strings.Contains(tag, "TimeOnly") {
+		d1, err = time.Parse(DatetimeFormat.TimeOnly, s1)
+	} else {
+		d1, err = time.Parse(DatetimeFormat.Full, s1)
+	}
+
+	if err != nil {
+		return
+	}
+
+	*((*time.Time)(unsafe.Pointer(fieldPtr))) = d1
+}
+
+func getStructPtr(arg0 interface{}) unsafe.Pointer {
+	return unsafe.Pointer(reflect.ValueOf(arg0).Pointer())
+}
+
+func getStructFieldPtr(structPtr unsafe.Pointer, field reflect.StructField) uintptr {
+	return uintptr(structPtr) + field.Offset
+}
+
+func indirect(arg0 interface{}) interface{} {
+	if arg0 == nil {
+		return nil
+	}
+
+	if rt := reflect.TypeOf(arg0); rt.Kind() != reflect.Ptr {
+		return arg0
+	}
+
+	rv := reflect.ValueOf(arg0)
+
+	for rv.Kind() == reflect.Ptr && !rv.IsNil() {
+		rv = rv.Elem()
+	}
+
+	return rv.Interface()
 }
