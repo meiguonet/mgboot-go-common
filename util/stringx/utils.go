@@ -544,7 +544,7 @@ func SubstringBefore(str, delimiter string, last ...bool) string {
 	if len(last) > 0 && last[0] {
 		idx = strings.LastIndex(str, delimiter)
 	} else {
-		strings.Index(str, delimiter)
+		idx = strings.Index(str, delimiter)
 	}
 
 	if idx < 1 {
@@ -564,7 +564,7 @@ func SubstringAfter(str, delimiter string, last ...bool) string {
 	if len(last) > 0 && last[0] {
 		idx = strings.LastIndex(str, delimiter)
 	} else {
-		strings.Index(str, delimiter)
+		idx = strings.Index(str, delimiter)
 	}
 
 	if idx < 0 {
