@@ -15,11 +15,15 @@ func Validate(validator *validator, data map[string]interface{}, rules []string,
 
 	errors := map[string]string{}
 
-	if len(data) < 1 || len(rules) < 1 {
+	if len(rules) < 1 {
 		return errors
 	}
 
-	handleData(data)
+	if len(data) < 1 {
+		data = map[string]interface{}{}
+	} else {
+		data = handleData(data)
+	}
 
 	for _, rule := range rules {
 		var checkOnNotEmpty bool
@@ -148,11 +152,15 @@ func FailfastValidate(validator *validator, data map[string]interface{}, rules [
 
 	var errorTips string
 
-	if len(data) < 1 || len(rules) < 1 {
+	if len(rules) < 1 {
 		return errorTips
 	}
 
-	handleData(data)
+	if len(data) < 1 {
+		data = map[string]interface{}{}
+	} else {
+		data = handleData(data)
+	}
 
 	for _, rule := range rules {
 		var checkOnNotEmpty bool
@@ -274,7 +282,9 @@ func FailfastValidateByStruct(validator *validator, arg0 interface{}, rules []st
 	return FailfastValidate(validator, structx.ToMap(arg0), rules, autoPanic...)
 }
 
-func handleData(data map[string]interface{}) {
+func handleData(data map[string]interface{}) map[string]interface{} {
+	keysToDelete := make([]string, 0)
+
 	for key, value := range data {
 		newKey := strings.ToLower(key)
 
@@ -283,8 +293,14 @@ func handleData(data map[string]interface{}) {
 		}
 
 		data[newKey] = value
+		keysToDelete = append(keysToDelete, key)
+	}
+
+	for _, key := range keysToDelete {
 		delete(data, key)
 	}
+
+	return data
 }
 
 func getMapFieldValue(data map[string]interface{}, key string) string {
